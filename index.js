@@ -22,6 +22,7 @@ async function run(){
     try{
         const categoriesCollection = client.db('productCategories').collection('categories');
         const waltonCollection = client.db('productCategories').collection('waltonCategories');
+        const allCategoryCollection = client.db('productCategories').collection('allCategories');
         app.get('/categories', async(req, res) => {
             const query = {};
             const categories = await categoriesCollection.find(query).toArray();
@@ -39,6 +40,25 @@ async function run(){
             console.log(categories);
             res.send(categories)
         })
+
+
+        // tttttttttt
+
+        app.get('/allcategories', async(req, res) =>{
+            const query = {};
+            const allcategories = await allCategoryCollection.find(query).toArray();
+            console.log(allcategories);
+            res.send(allcategories)
+        });
+
+         app.get("/allcategories/:id", async (req, res) => {
+           const id = req.params.id;
+           console.log(id);
+           const query = { _id: ObjectId(id)};
+           const bookings = await allCategoryCollection.find(query).toArray();
+           console.log(bookings);
+           res.send(bookings);
+         });
 
     }
     finally{
