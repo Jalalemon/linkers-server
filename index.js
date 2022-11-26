@@ -38,6 +38,17 @@ async function run() {
       .db("productCategories")
       .collection("bookings");
     const userCollection = client.db("productCategories").collection("users");
+
+    const verifyAdmin = async (req, res, next) => {
+      const decodedEmail = req.query.email;
+      const query = { email: decodedEmail };
+      const user = await userCollection.findOne(query);
+      if (user?.role !== "admin") {
+        return res.status(403).send({ message: "forbidden access" });
+      }
+      next();
+    };
+
     app.get("/categories", async (req, res) => {
       const query = {};
       const categories = await categoriesCollection.find(query).toArray();
@@ -98,8 +109,13 @@ async function run() {
     });
 
     app.get("/allcategories", verifyJWT, async (req, res) => {
-        console.log(req.headers.authorization);
+      console.log(req.headers.authorization);
       const email = req.query.email;
+      const decodedEmail = req.decoded.email;
+      if (email !== decodedEmail) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
+      console.log("token ps", req.headers.authorization);
       const query = { email: email };
       const allcategories = await allCategoryCollection.find(query).toArray();
       res.send(allcategories);
@@ -118,30 +134,62 @@ async function run() {
       res.send(result);
     });
 
-        function verifyJWT(req, res, next) {
-          const authHeader = req.headers.authorization;
-          if (!authHeader) {
-            return res.status(401).send("unauthorized access");
+    function verifyJWT(req, res, next) {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) {
+        return res.status(401).send("unauthorized access");
+      }
+      const token = authHeader.split(" ")[1];
+      jwt.verify(
+        token,
+        process.env.ACCESS_TOKEN_SECRET,
+        function (err, decoded) {
+          if (err) {
+            console.log(err);
+            return res.status(403).send({ message: "forbidden access" });
           }
-          const token = authHeader.split(" ")[1];
-          jwt.verify(
-            token,
-            process.env.ACCESS_TOKEN_SECRET,
-            function (err, decoded) {
-              if (err) {
-                console.log(err);
-                return res.status(403).send({ message: "forbidden access" });
-              }
-              req.decoded = decoded;
-              next();
-            }
-          );
+          req.decoded = decoded;
+          next();
         }
+      );
+    }
+    app.get("/users/admin/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { email };
+      const user = await userCollection.findOne(query);
+      res.send({ isAdmin: user?.role === "admin" });
+    });
+    //verifyAdmin, verifyJWT,
+    app.patch("/users/admin/:id", async (req, res) => {
+      const decodedEmail = req.decoded.email;
+      const query = { email: decodedEmail };
+      const user = await userCollection.findOne(query);
 
+      if (user?.role !== "admin") {
+        return res.status(403).send({ message: "forbidden access" });
+      }
+      const id = req.params.id;
+      const filter = { _id: ObjectId(id) };
+      const options = { upsert: true };
+      const updateDoc = {
+        $set: {
+          role: "admin",
+        },
+      };
+      const result = await userCollection.updateOne(filter, updateDoc, options);
+      res.send(result);
+    });
+
+    app.delete("/users/:id", verifyJWT, verifyAdmin, async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: ObjectId(id) };
+      const result = await userCollection.deleteOne(filter);
+      res.send(result);
+    });
     /** jwt token */
 
     app.get("/jwt", async (req, res) => {
-      const email = req.query.email
+      const email = req.query.email;
       const query = { email: email };
       console.log(query);
       const user = await userCollection.findOne(query);
@@ -154,8 +202,6 @@ async function run() {
       console.log(user);
       return res.status(403).send({ accessToken: "" });
     });
-    
-
   } finally {
   }
 }
