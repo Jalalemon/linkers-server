@@ -3,6 +3,7 @@ const cors = require("cors");
 const port = process.env.PORT || 5000;
 require("dotenv").config();
 const app = express();
+const jwt = require("jsonwebtoken");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 
 app.use(cors());
@@ -36,9 +37,7 @@ async function run() {
     const bookingsCollection = client
       .db("productCategories")
       .collection("bookings");
-       const userCollection = client
-         .db("productCategories")
-         .collection("users");
+    const userCollection = client.db("productCategories").collection("users");
     app.get("/categories", async (req, res) => {
       const query = {};
       const categories = await categoriesCollection.find(query).toArray();
@@ -98,9 +97,9 @@ async function run() {
       res.send(categories);
     });
 
-    app.get("/allcategories", async (req, res) => {
+    app.get("/allcategories", verifyJWT, async (req, res) => {
+        console.log(req.headers.authorization);
       const email = req.query.email;
-      console.log(email);
       const query = { email: email };
       const allcategories = await allCategoryCollection.find(query).toArray();
       res.send(allcategories);
@@ -108,17 +107,55 @@ async function run() {
     /*
     users collection */
 
-      app.get("/users", async (req, res) => {
-        const query = {};
-        const users = await userCollection.find(query).toArray();
-        res.send(users);
-      });
-      app.post("/users", async (req, res) => {
-        const user = req.body;
-        const result = await userCollection.insertOne(user);
-        res.send(result);
-      });
+    app.get("/users", async (req, res) => {
+      const query = {};
+      const users = await userCollection.find(query).toArray();
+      res.send(users);
+    });
+    app.post("/users", async (req, res) => {
+      const user = req.body;
+      const result = await userCollection.insertOne(user);
+      res.send(result);
+    });
+
+        function verifyJWT(req, res, next) {
+          const authHeader = req.headers.authorization;
+          if (!authHeader) {
+            return res.status(401).send("unauthorized access");
+          }
+          const token = authHeader.split(" ")[1];
+          jwt.verify(
+            token,
+            process.env.ACCESS_TOKEN_SECRET,
+            function (err, decoded) {
+              if (err) {
+                console.log(err);
+                return res.status(403).send({ message: "forbidden access" });
+              }
+              req.decoded = decoded;
+              next();
+            }
+          );
+        }
+
+    /** jwt token */
+
+    app.get("/jwt", async (req, res) => {
+      const email = req.query.email
+      const query = { email: email };
+      console.log(query);
+      const user = await userCollection.findOne(query);
+      if (user) {
+        const token = jwt.sign({ email }, process.env.ACCESS_TOKEN_SECRET, {
+          expiresIn: "5d",
+        });
+        return res.send({ accessToken: token });
+      }
+      console.log(user);
+      return res.status(403).send({ accessToken: "" });
+    });
     
+
   } finally {
   }
 }
