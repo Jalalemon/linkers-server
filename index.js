@@ -2,6 +2,8 @@ const express = require("express");
 const cors = require("cors");
 const port = process.env.PORT || 5000;
 require("dotenv").config();
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+
 const app = express();
 const jwt = require("jsonwebtoken");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
@@ -38,6 +40,7 @@ async function run() {
       .db("productCategories")
       .collection("bookings");
     const userCollection = client.db("productCategories").collection("users");
+    const paymentCollection = client.db("productCategories").collection("payments");
 
     const verifyAdmin = async (req, res, next) => {
       const decodedEmail = req.query.email;
@@ -89,6 +92,18 @@ async function run() {
         const myOrder = await bookingsCollection.find(query).toArray();
         console.log(myOrder);
         res.send(myOrder)
+    });
+    app.get('/myOrder', async(req, res) =>{
+    
+      const query = {};
+      const result = await bookingsCollection.find(query).toArray();
+      res.send(result);
+    })
+    app.get('/myOrder/:id', async(req, res) =>{
+      const id = req.params.id;
+      const query = {_id: ObjectId(id)};
+      const result = await bookingsCollection.findOne(query);
+      res.send(result);
     })
     app.post("/singers", async (req, res) => {
       const data = req.body;
@@ -129,8 +144,26 @@ async function run() {
       const allcategories = await allCategoryCollection.find(query).toArray();
       res.send(allcategories);
     });
-    // 2nd all categories
+    // 2nd all payment
 
+    app.post('/payments', async(req, res) =>{
+      const payment = req.body;
+      const result = await paymentCollection.insertOne(payment);
+      const id = payment.bookingId;
+      const filter = {_id: ObjectId(id)}
+      const updateDoc = {
+        $set: {
+          paid: true,
+          transactionId: payment.transactionId
+
+        }
+      }
+      const updateResult = await bookingsCollection.updateOne(filter, updateDoc)
+      res.send(result)
+    })
+
+    
+    // products
     app.delete('/myProducts/:id', async(req, res) => {
         const id = req.params.id;
         const filter = { _id: ObjectId(id) };
@@ -206,6 +239,26 @@ async function run() {
      res.send({ isAdmin: user?.role === "admin" });
     });
 
+    // payment intents
+
+    app.post('/create-payment-intent', async(req, res) =>{
+      const bookings = req.body;
+      const balance = parseInt(bookings.balance);
+      const amount = balance * 100;
+      
+      const paymentIntent = await stripe.paymentIntents.create({
+        currency: 'usd',
+        amount : amount,
+        'payment_method_types': [
+          'card'
+        ],
+      });
+      res.send({
+        clientSecret: paymentIntent.client_secret,
+      });
+    })
+
+
     //verifyAdmin, verifyJWT,
     app.put("/users/admin/:id", async (req, res) => {
       const decodedEmail = req.decoded.email;
@@ -252,6 +305,7 @@ async function run() {
       console.log(user);
       return res.status(403).send({ accessToken: "" });
     });
+
   } finally {
   }
 }
