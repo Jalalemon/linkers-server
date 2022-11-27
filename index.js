@@ -41,6 +41,7 @@ async function run() {
       .collection("bookings");
     const userCollection = client.db("productCategories").collection("users");
     const paymentCollection = client.db("productCategories").collection("payments");
+    const advertiseCollection = client.db("productCategories").collection("advertise");
 
     const verifyAdmin = async (req, res, next) => {
       const decodedEmail = req.query.email;
@@ -213,6 +214,16 @@ async function run() {
       res.send(result);
     });
 
+      app.delete("/users/:id", async (req, res) => {
+        const id = req.params.id;
+        const query = { _id: ObjectId(id) };
+        const result = await userCollection.deleteOne(query);
+        res.send(result);
+      });
+
+    // advertise
+
+
     function verifyJWT(req, res, next) {
       const authHeader = req.headers.authorization;
       if (!authHeader) {
@@ -288,7 +299,22 @@ async function run() {
       res.send(result);
     });
 
-   
+   app.post('/advertisments', async(req, res) => {
+    const advertise = req.body;
+    const result = await advertiseCollection.insertOne(advertise)
+    res.send(result)
+   })
+   app.get('/advertise', async (req, res) =>{
+    const query ={}
+    const result = await advertiseCollection.find(query).toArray();
+    res.send(result)
+   });
+   app.get('/advertiseHome', async(req, res) =>{
+    const email = req.query.email;
+    const query= {email: email};
+    const result = await advertiseCollection.find(query).toArray()
+    res.send(result)
+   })
     /** jwt token */
 
     app.get("/jwt", async (req, res) => {
@@ -305,6 +331,36 @@ async function run() {
       console.log(user);
       return res.status(403).send({ accessToken: "" });
     });
+
+    // admin panel
+
+
+        app.get("/users/admin/:id", async (req, res) => {
+          const id = id.params.id;
+          const query = { _id: ObjectId(id) };
+          const user = await userCollection.findOne(query);
+          res.send({ isAdmin: user?.role === "admin" });
+        });
+
+         app.get("/users/admin/:email", async (req, res) => {
+           const email = req.params.email;
+           const query = { email };
+           const user = await userCollection.findOne(query);
+           res.send({ isAdmin: user?.role === "admin" });
+         });
+         app.get("/users/seller/:email", async (req, res) => {
+           const email = req.params.email;
+           const query = { email };
+           const user = await userCollection.findOne(query);
+           res.send({ isSeller: user?.role === "seller" });
+         });
+         app.get("/users/Buyer/:email", async (req, res) => {
+           const email = req.params.email;
+           const query = { email };
+           const user = await userCollection.findOne(query);
+           res.send({ isBuyer: user?.role === "Buyer" });
+         });
+
 
   } finally {
   }
