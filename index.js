@@ -314,6 +314,12 @@ async function run() {
     const query= {email: email};
     const result = await advertiseCollection.find(query).toArray()
     res.send(result)
+   });
+   app.get('/advertiseProduct', async(req, res) => {
+    const productId = req.query.productId;
+    const query = {productId : productId};
+    const result = await advertiseCollection.findOne(query)
+    res.send(result)
    })
     /** jwt token */
 
